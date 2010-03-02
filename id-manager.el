@@ -1,10 +1,10 @@
 ;;; id-manager.el --- id-password management 
 
 ;; Copyright (C) 2009  SAKURAI Masashi
-;; Time-stamp: <2009-06-14 01:02:30 sakurai>
+;; Time-stamp: <2010-03-02 16:44:53 sakurai>
 
 ;; Author: SAKURAI Masashi <m.sakurai@kiwanami.net>
-;; Keywords: convenience
+;; Keywords: password, convenience
 
 ;; This program is free software; you can redistribute it and/or modify
 ;; it under the terms of the GNU General Public License as published by
@@ -47,11 +47,26 @@
 ;; ------------------------------
 ;; If you have anything.el, bind `id-manager' to key,
 ;; like (global-set-key (kbd "M-7") 'id-manager).
+
+;;; Setting example:
+
+;; For EasyPG users:
 ;; 
-;; If you use EasyPG (included in emacs23) and encrypt the DB by
-;; symmetric-encryption, the following setting is useful: 
-;; (setq epa-file-cache-passphrase-for-symmetric-encryption t) and
-;; (setenv "GPG_AGENT_INFO" nil).
+;; (autoload 'id-manager "id-manager" nil t)
+;; (global-set-key (kbd "M-7") 'id-manager)                     ; anything UI
+;; (setq epa-file-cache-passphrase-for-symmetric-encryption t)  ; saving password
+;; (setenv "GPG_AGENT_INFO" nil)                                ; non-GUI password dialog.
+
+;; For alpaca users:
+;; 
+;; (autoload 'id-manager "id-manager" nil t)
+;; (global-set-key (kbd "M-7") 'id-manager) ; anything UI
+;; (setq idm-db-buffer-save-function ; adjustment for alpaca.el
+;;       (lambda (file)
+;;         (set-visited-file-name file)
+;;         (alpaca-save-buffer))
+;;       idm-db-buffer-password-var  ; if you are using `alpaca-cache-passphrase'.
+;;         'alpaca-passphrase)
 
 ;;; Current implementation:
 
@@ -65,7 +80,7 @@
 
 ;;; Code:
 
-(require 'cl)
+(eval-when-compile (require 'cl))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Setting
@@ -82,6 +97,21 @@
 (defvar idm-copy-action
   (lambda (text) (x-select-text text))
   "Action for copying a password text into clipboard.")
+
+(defvar idm-db-buffer-load-function
+  'find-file-noselect
+  "File loading function. This function has one argument FILENAME and returns a buffer,
+  like `find-file-noselect'. Some decryption should work at this
+  function.")
+
+(defvar idm-db-buffer-save-function 
+  'write-file
+  "File saving function. This function has one arguments FILENAME,
+  like `write-file'. Some encryption should work at this
+  function.")
+
+(defvar idm-db-buffer-password-var nil
+  "Password variable. See the text of settings for alpaca.el. ")
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Macros
@@ -116,16 +146,19 @@
   "Load the DB file `idm-database-file' and make a DB object."
   (let* ((coding-system-for-read 'utf-8)
          (tmpbuf 
-          (find-file-noselect 
-           (expand-file-name idm-database-file)
-           nil nil nil))
+          (funcall idm-db-buffer-load-function
+           (expand-file-name idm-database-file)))
          db-object)
     (unwind-protect
-        (progn 
-          (idm--make-db tmpbuf))
+        (let ((db (idm--make-db tmpbuf)))
+          (when idm-db-buffer-password-var
+            (with-current-buffer tmpbuf 
+              (funcall db 'file-password 
+                       (symbol-value idm-db-buffer-password-var))))
+          db)
       (kill-buffer tmpbuf))))
 
-(defun idm--save-db (records)
+(defun idm--save-db (records &optional password)
   "Save RECORDS into the DB file `idm-database-file'. This
 function is called by a DB object."
   (let ((coding-system-for-write 'utf-8)
@@ -141,14 +174,16 @@ function is called by a DB object."
                         (idm--aif (idm-record-memo i)
                             (concat "\t" it))
                         "\n")))
-    (write-file idm-database-file)
-    (kill-buffer tmpbuf))))
+      (when password
+        (set idm-db-buffer-password-var password))
+      (funcall idm-db-buffer-save-function idm-database-file)
+      (kill-buffer tmpbuf))))
 
 (defun idm--make-db (tmpbuf)
   "Build a database management object from the given buffer text.
 The object is a dispatch function. One can access the methods
 `funcall' with the method name symbol and some method arguments."
-  (lexical-let (records (db-modified nil))
+  (lexical-let (records (db-modified nil) file-password)
     (idm--each-line 
      tmpbuf 
      (lambda (line)
@@ -181,8 +216,10 @@ The object is a dispatch function. One can access the methods
         (setq db-modified t))
        ((eq method 'save)                     ; save
         (when db-modified 
-          (idm--save-db records)
+          (idm--save-db records file-password)
           (setq db-modified nil)))
+       ((eq method 'file-password)            ; file-password
+        (setq file-password (car args)) nil)
        (t (error "Unknown method [%s]" method))))))
 
 (defun idm--each-line (buf task)
@@ -559,12 +596,12 @@ lines. ORDER is sort key, which can be `time', `name' and `id'."
   "Save the DB and kill buffer."
   (interactive)
   (funcall idm-db 'save)
-  (kill-buffer))
+  (kill-buffer (current-buffer)))
 
 (defun idm-list-mode-quit-without-save ()
   "Kill buffer without saving the DB."
   (interactive)
-  (kill-buffer))
+  (kill-buffer (current-buffer)))
 
 (defun idm-list-mode-delete ()
   "Delete a selected record from the DB. After deleting, update
