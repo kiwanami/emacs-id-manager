@@ -1,7 +1,7 @@
 ;;; id-manager.el --- id-password management 
 
 ;; Copyright (C) 2009  SAKURAI Masashi
-;; Time-stamp: <2010-03-02 16:44:53 sakurai>
+;; Time-stamp: <2010-12-18 14:25:02 sakurai>
 
 ;; Author: SAKURAI Masashi <m.sakurai@kiwanami.net>
 ;; Keywords: password, convenience
@@ -586,7 +586,6 @@ lines. ORDER is sort key, which can be `time', `name' and `id'."
   (setq idm-db db)
   
   (setq truncate-lines t)
-  (setq truncate-partial-width-windows t)
   (use-local-map idm-list-mode-map)
   (setq major-mode 'idm-list-mode
         mode-name "ID-Password List")
