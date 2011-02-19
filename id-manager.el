@@ -1,7 +1,7 @@
 ;;; id-manager.el --- id-password management 
 
 ;; Copyright (C) 2009, 2010, 2011  SAKURAI Masashi
-;; Time-stamp: <2011-02-19 23:00:19 sakurai>
+;; Time-stamp: <2011-02-19 23:18:32 sakurai>
 
 ;; Author: SAKURAI Masashi <m.sakurai@kiwanami.net>
 ;; Keywords: password, convenience
@@ -279,10 +279,16 @@ recording."
   (interactive)
   (setq idm-show-password (not idm-show-password)))
 
-(defun idm-add-record-dialog (on-ok-func)
+(defun idm-add-record-dialog (db on-ok-func)
   "Make an account record interactively and register it with DB."
-  (idm-edit-record-dialog 
-   (make-idm-record) on-ok-func))
+  (lexical-let ((db db) (on-ok-func on-ok-func))
+    (idm-edit-record-dialog 
+     (make-idm-record) 
+     (lambda (r) 
+       (cond
+        ((funcall db 'get (idm-record-name r))
+         (idm-edit-record-dialog r on-ok-func nil "Record [%s] exists!"))
+        (t (funcall on-ok-func r)))))))
 
 (defun idm-edit-record-dialog (record on-ok-func &optional password-show error-msg)
   "Pop up the edit buffer for the given record.
@@ -662,7 +668,7 @@ the list buffer."
   (interactive)
   (lexical-let ((db idm-db)
                 (curbuf (current-buffer)))
-    (idm-add-record-dialog 
+    (idm-add-record-dialog db
      (lambda (r) 
        (with-current-buffer curbuf
          (funcall db 'add-record r)
@@ -700,7 +706,7 @@ buffer."
   "Add a new record by the anything interface."
   (interactive)
   (lexical-let ((db db))
-    (idm-add-record-dialog 
+    (idm-add-record-dialog db
      (lambda (r)
        (funcall db 'add-record r)
        (funcall db 'save)
