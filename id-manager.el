@@ -1,7 +1,7 @@
 ;;; id-manager.el --- id-password management 
 
 ;; Copyright (C) 2009, 2010, 2011  SAKURAI Masashi
-;; Time-stamp: <2011-02-19 14:28:37 sakurai>
+;; Time-stamp: <2011-02-19 23:00:19 sakurai>
 
 ;; Author: SAKURAI Masashi <m.sakurai@kiwanami.net>
 ;; Keywords: password, convenience
@@ -95,8 +95,8 @@
 
 (defvar idm-gen-password-cmd
   "head -c 10 < /dev/random | uuencode -m - | tail -n 2 |head -n 1 | head -c10")
-                                        ;  "openssl rand 32 | uuencode -m - | tail -n 2 |head -n 1 | head -c10"
-                                        ;  ...any other password generation ?
+;;  "openssl rand 32 | uuencode -m - | tail -n 2 |head -n 1 | head -c10"
+;;  ...any other password generation ?
 
 (defvar idm-copy-action
   (lambda (text) (x-select-text text))
@@ -209,8 +209,13 @@ The object is a dispatch function. One can access the methods
        ((eq method 'get-all-records) records) ; get-all-records
        ((eq method 'add-record)               ; add-record
         (progn 
-          (push (car args) records)
-          (setq db-modified t)))
+          (lexical-let* ((record (car args)) 
+                         (name (idm-record-name record)))
+            (setf records (delete-if 
+                           (lambda (i) (equal (idm-record-name i) name))
+                           records))
+            (push record records)
+            (setq db-modified t))))
        ((eq method 'delete-record-by-name)    ; delete-record-by-name
         (lexical-let ((name (car args)))
           (setf records (delete-if 
@@ -265,153 +270,146 @@ recording."
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; GUI
 
-(defun idm-add-record (db)
-  "Make an account record interactively and register it with DB."
-  (let (name id password memo)
-    (setq name (read-string "Account Name : "))
-    (when name
-      (setq id (read-string "Account ID : "))
-      (when id
-        (setq password 
-              (if (y-or-n-p "Generate a password ? : ")
-                  (read-string "Account Password : " (idm-gen-password))
-                (read-passwd "Account Password : " t)))
-        (setq memo (read-string "Memo : "))
-        (funcall db 'add-record (make-idm-record-bylist 
-                                 name id password 
-                                 (idm--strtime (current-time)) memo))))))
-
-(defun idm-edit-record (record)
-  "Edit a record. If editting is finished successfully, return t."
-  (when (and record (idm-record-p record))
-    (let (name id password memo)
-      (setq name (read-string "Account Name : " (idm-record-name record)))
-      (when name
-        (setq id (read-string "Account ID : " (idm-record-account-id record)))
-        (when id
-          (setq password 
-                (if (y-or-n-p "Generate a password ? : ")
-                    (read-string "Account Password : " (idm-gen-password))
-                  (read-passwd "Account Password : " t (idm-record-password record))))
-          (setq memo (read-string "Memo : " (idm-record-memo record)))
-          (setf (idm-record-name record) name
-                (idm-record-account-id record) id
-                (idm-record-password record) password
-                (idm-record-update-time record) (idm--strtime (current-time))
-                (idm-record-memo record) memo)
-          t)))))
-
-(defun idm-edit-record-field (record field)
-  "Edit a field of the record. FIELD is a symbol, which can be
-`name', `id' and `memo'.  If editting is finished successfully,
-return t."
-  (when (and record (idm-record-p record))
-    (let (title getter setter)
-      (cond 
-       ((eq field 'name)
-        (setq title "Name : "
-              getter (lambda (r) (idm-record-name r))
-              setter (lambda (r c) (setf (idm-record-name r) c))))
-       ((eq field 'id)
-        (setq title "ID : "
-              getter (lambda (r) (idm-record-account-id r))
-              setter (lambda (r c) (setf (idm-record-account-id r) c))))
-       ((eq field 'memo)
-        (setq title "Memo : "
-              getter (lambda (r) (idm-record-memo r))
-              setter (lambda (r c) (setf (idm-record-memo r) c))))
-       (t (error "BUG : No such field symbol. %S" field)))
-      (let ((data (read-string title (funcall getter record))))
-        (if data
-            (progn
-              (funcall setter record data)
-              (setf (idm-record-update-time record) (idm--strtime (current-time)))
-              t) nil)))))
-
-(defun idm-edit-record-password (record)
-  "Edit a password field of the record. If editting is finished successfully, return t."
-  (when (and record (idm-record-p record))
-    (let ((password 
-           (if (y-or-n-p "Generate a password ? : ")
-               (read-string "Account Password : " (idm-gen-password))
-             (read-passwd "Account Password : " t (idm-record-password record)))))
-      (setf (idm-record-password record) password
-            (idm-record-update-time record) (idm--strtime (current-time)))
-      t)))
-
 (defvar idm-show-password nil
   "Display passwords switch. If this variable is non-nil, some
   functions show the password as plain text.")
 
 (defun idm-toggle-show-password ()
-  "Toggle the switch for display passwords."
+  "Toggle the switch for display passwords. This function does not update views."
   (interactive)
   (setq idm-show-password (not idm-show-password)))
 
-(defun idm-edit-record-dialog (record on-ok-func)
-  "edit-record-dialog
-RECORD"
+(defun idm-add-record-dialog (on-ok-func)
+  "Make an account record interactively and register it with DB."
+  (idm-edit-record-dialog 
+   (make-idm-record) on-ok-func))
+
+(defun idm-edit-record-dialog (record on-ok-func &optional password-show error-msg)
+  "Pop up the edit buffer for the given record.
+If the user pushes the `ok' button, the function
+`idm-edit-record-dialog-commit' is called."
   (let ((before-win-num (length (window-list)))
-        (main-buf (current-buffer)))
-    (pop-to-buffer "*idm-record-dialog*")
-    (kill-all-local-variables)
-    (set (make-local-variable 'idm-before-win-num) before-win-num)
-    (set (make-local-variable 'idm-main-buf) main-buf))
-  (let ((inhibit-read-only t)) (erase-buffer))
-  (remove-overlays)
-  (widget-insert
-   (format "Record: %s\n\n"
-           (if record (idm-record-name record) "(new record)")))
-  (lexical-let 
-      ((record record) (on-ok-func on-ok-func)
-       (fields
-        (list
-         'name (widget-create
-                'editable-field
-                :size 20 :format "Account Name: %v \n"
-                :value (or (idm-record-name record) ""))
-         'id (widget-create
-              'editable-field
-              :size 20 :format "Account ID  : %v \n"
-              :value (or (idm-record-account-id record) ""))
-         'password (widget-create
-                    'editable-field
-                    :size 20 :format "Password: %v \n"
-                    :secret (if idm-show-password nil ?*)
-                    :value (or (idm-record-password record) ""))
-         'memo (widget-create
-                'editable-field
-                :size 20
-                :format "Memo   : %v \n"
-                :value (or (idm-record-memo record) "")))))
-    (widget-create 
-     'push-button
-     :notify (lambda (&rest ignore)
-               (idm-edit-record-dialog-commit record fields on-ok-func))
-     "Ok")
-    (widget-insert " ")
-    (widget-create
-     'push-button
-     :notify (lambda (&rest ignore)
-               (idm-edit-record-kill-buffer))
-     "Cancel")
-    (widget-insert "\n")
-    (use-local-map widget-keymap)
-    (widget-setup)))
+        (main-buf (current-buffer))
+        (edit-buf (idm--edit-record-dialog-buffer record on-ok-func password-show error-msg)))
+    (with-current-buffer edit-buf
+      (set (make-local-variable 'idm-before-win-num) before-win-num)
+      (set (make-local-variable 'idm-main-buf) main-buf))
+    (pop-to-buffer edit-buf)))
+
+(defun idm--edit-record-dialog-buffer (record on-ok-func &optional password-show error-msg)
+  "Return the editing buffer for the given record."
+  (let ((buf (get-buffer-create "*idm-record-dialog*")))
+    (with-current-buffer buf
+      (let ((inhibit-read-only t)) (erase-buffer))
+      (kill-all-local-variables)
+      (remove-overlays)
+      (widget-insert
+       (format "Record: %s\n\n"
+               (idm--aif (idm-record-name record) it "(new record)")))
+      (when error-msg
+        (widget-insert
+         (let ((text (substring-no-properties error-msg)))
+           (put-text-property 0 (length text) 'face 'font-lock-warning-face text)
+           text))
+        (widget-insert "\n\n"))
+      (lexical-let 
+          ((record record) (on-ok-func on-ok-func) (error-msg error-msg)
+           fname fid fpassword fmemo cbshow bgenerate fields)
+        ;; create dialog fields
+        (setq fname (widget-create
+                     'editable-field
+                     :size 20 :format "  Account Name: %v \n"
+                     :value (or (idm-record-name record) ""))
+              fid (widget-create
+                   'editable-field
+                   :size 20 :format "  Account ID  : %v \n"
+                   :value (or (idm-record-account-id record) ""))
+              fpassword (widget-create
+                         'editable-field
+                         :size 20 :format "  Password: %v \n"
+                         :secret (and (not password-show) ?*)
+                         :value (or (idm-record-password record) "")))
+        (widget-insert "    (show password ")
+        (setq cbshow
+              (widget-create 'checkbox  :value password-show))
+        (widget-insert " ) ")
+        (setq bgenerate
+              (widget-create 'push-button "Generate"))
+        (widget-insert "\n")
+        (setq fmemo (widget-create
+                     'editable-field
+                     :size 20
+                     :format "  Memo   : %v \n"
+                     :value (or (idm-record-memo record) "")))
+        (setq fields
+              (list 'name fname 'id fid 'password fpassword 'memo fmemo 'password-show cbshow))
+
+        ;; OK / Cancel
+        (widget-insert "\n")
+        (widget-create 
+         'push-button
+         :notify (lambda (&rest ignore)
+                   (idm-edit-record-dialog-commit record fields on-ok-func))
+         "Ok")
+        (widget-insert " ")
+        (widget-create
+         'push-button
+         :notify (lambda (&rest ignore)
+                   (idm-edit-record-kill-buffer))
+         "Cancel")
+        (widget-insert "\n")
+
+        ;; add event actions
+        (widget-put cbshow
+                    :notify
+                    (lambda (&rest ignore)
+                      (let ((current-record 
+                             (make-idm-record
+                              :name (widget-value fname)
+                              :account-id (widget-value fid)
+                              :password (widget-value fpassword)
+                              :memo (widget-value fmemo)))
+                            (password-show (widget-value cbshow)))
+                        (message "CLICK : %s" password-show)
+                        (idm-edit-record-kill-buffer)
+                        (idm-edit-record-dialog
+                         current-record on-ok-func password-show error-msg)
+                        (widget-forward 3))))
+        (widget-put bgenerate
+                    :notify
+                    (lambda (&rest ignore) 
+                      (widget-value-set fpassword (idm-gen-password))
+                      (widget-setup)))
+
+        ;; setup widgets
+        (use-local-map widget-keymap)
+        (widget-setup)
+        (goto-char (point-min))
+        (widget-forward 1)))
+    buf))
 
 (defun idm-edit-record-dialog-commit (record fields on-ok-func)
   "edit-record-dialog-commit"
-  (setf (idm-record-name record) 
-        (widget-value (plist-get fields 'name))
-        (idm-record-account-id record) 
-        (widget-value (plist-get fields 'id))
-        (idm-record-password record) 
-        (widget-value (plist-get fields 'password))
-        (idm-record-memo record) 
-        (widget-value (plist-get fields 'memo))
-        (idm-record-update-time record) (idm--strtime (current-time)))
-  (idm-edit-record-kill-buffer)
-  (funcall on-ok-func))
+  (let ((name-value (widget-value (plist-get fields 'name))))
+    (cond
+     ((or (null name-value)
+          (string-equal "" name-value))
+      (idm-edit-record-kill-buffer)
+      (idm-edit-record-dialog
+       record on-ok-func
+       (widget-value (plist-get fields 'password-show))
+       "Should not be empty!"))
+     (t
+      (setf (idm-record-name record) name-value
+            (idm-record-account-id record) 
+            (widget-value (plist-get fields 'id))
+            (idm-record-password record) 
+            (widget-value (plist-get fields 'password))
+            (idm-record-memo record) 
+            (widget-value (plist-get fields 'memo))
+            (idm-record-update-time record) (idm--strtime (current-time)))
+      (idm-edit-record-kill-buffer)
+      (funcall on-ok-func record)))))
 
 (defun idm-edit-record-kill-buffer ()
   "edit-record-kill-buffer"
@@ -475,28 +473,28 @@ lines. ORDER is sort key, which can be `time', `name' and `id'."
               id-max (min 20 (max id-max (length (idm-record-account-id i))))
               pw-max (max pw-max (length (funcall pw-getter i)))))
       (setq line-format (format line-format numcolm name-max id-max pw-max))
-      (unwind-protect
-          (progn
-            (setq buffer-read-only nil)
-            (erase-buffer)
-            (goto-char (point-min))
-            (insert (format line-format
-                            " " "Time" "Name" "ID" "Password" "Memo"))
-            (insert (make-string (- (window-width) 1) ?-) "\n")
-            (dolist (i (idm--sort-records records order))
-              (insert 
-               (idm--put-record-id
-                (format line-format 
-                        count
-                        (idm-record-update-time i)
-                        (funcall cut (idm-record-name i))
-                        (funcall cut (idm-record-account-id i))
-                        (funcall pw-getter i)
-                        (idm-record-memo i))
-                (idm-record-name i)))
-              (incf count))
-            (goto-char (point-min)))
-        (setq buffer-read-only t)))))
+      (let ((buffer-read-only nil) (prev-line (line-number-at-pos)))
+        (erase-buffer)
+        (goto-char (point-min))
+        (insert (format line-format
+                        " " "Time" "Name" "ID" "Password" "Memo"))
+        (insert (make-string (- (window-width) 1) ?-) "\n")
+        (dolist (i (idm--sort-records records order))
+          (insert 
+           (idm--put-record-id
+            (format line-format 
+                    count
+                    (idm-record-update-time i)
+                    (funcall cut (idm-record-name i))
+                    (funcall cut (idm-record-account-id i))
+                    (funcall pw-getter i)
+                    (idm-record-memo i))
+            (idm-record-name i)))
+          (incf count))
+        (goto-char (point-min))
+        (when (< 1 prev-line)
+          (ignore-errors
+            (forward-line (1- prev-line))))))))
 
 (defun idm--sort-records (records order)
   "Sort records by the key ORDER, which can be `time', `name',
@@ -655,14 +653,20 @@ the list buffer."
   (interactive)
   (idm--aif (idm--get-record-id)
       (progn
-        (funcall idm-db 'delete-record-by-name it)
-        (idm--layout-list idm-db))))
+        (when (y-or-n-p (format "Delete this record[%s] ?" it))
+          (funcall idm-db 'delete-record-by-name it)
+          (idm--layout-list idm-db)))))
 
 (defun idm-list-mode-add ()
   "Add a new record. After adding, update the list buffer."
   (interactive)
-  (idm-add-record idm-db)
-  (idm--layout-list idm-db))
+  (lexical-let ((db idm-db)
+                (curbuf (current-buffer)))
+    (idm-add-record-dialog 
+     (lambda (r) 
+       (with-current-buffer curbuf
+         (funcall db 'add-record r)
+         (idm--layout-list db))))))
 
 (defun idm-list-mode-edit-dialog ()
   "Edit the selected record. After editting, update the list
@@ -671,13 +675,14 @@ buffer."
   (idm--aif (idm--get-record-id)
       (let ((record (funcall idm-db 'get it)))
         (if record
-            (lexical-let ((db idm-db) 
+            (lexical-let ((db idm-db) (prev record)
                           (curbuf (current-buffer)))
               (idm-edit-record-dialog 
                record
-               (lambda () 
+               (lambda (r) 
                  (with-current-buffer curbuf
-                   (funcall db 'set-modified)
+                   (funcall db 'delete-record-by-name (idm-record-name prev))
+                   (funcall db 'add-record r)
                    (idm--layout-list db)))))))))
 
 (defun idm-open-list-command (&optional db)
@@ -691,15 +696,29 @@ buffer."
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Anything UI
 
+(defun idm-anything-add-dialog (db)
+  "Add a new record by the anything interface."
+  (interactive)
+  (lexical-let ((db db))
+    (idm-add-record-dialog 
+     (lambda (r)
+       (funcall db 'add-record r)
+       (funcall db 'save)
+       (when (eq major-mode 'idm-list-mode)
+         (idm--layout-list db))))))
+
 (defun idm-anything-edit-dialog (db record)
   "Edit a record selected by the anything interface."
   (interactive)
-  (lexical-let ((db db))
+  (lexical-let ((db db) (prev record))
     (idm-edit-record-dialog 
      record
-     (lambda () 
-       (funcall db 'set-modified)
-       (funcall db 'save)))))
+     (lambda (r)
+       (funcall db 'delete-record-by-name (idm-record-name prev))
+       (funcall db 'add-record r)
+       (funcall db 'save)
+       (when (eq major-mode 'idm-list-mode)
+         (idm--layout-list db))))))
 
 (when (featurep 'anything)
 
@@ -711,10 +730,7 @@ buffer."
               (candidates 
                . (("Add a record" .
                    (lambda ()
-                     (idm-add-record db)
-                     (funcall db 'save)
-                     (when (eq major-mode 'idm-list-mode)
-                       (idm--layout-list db))))
+                     (idm-anything-add-dialog db)))
                   ("Show all records" .
                    (lambda ()
                      (idm-open-list-command db)))))
