@@ -1,7 +1,7 @@
 ;;; id-manager.el --- id-password management 
 
 ;; Copyright (C) 2009, 2010, 2011  SAKURAI Masashi
-;; Time-stamp: <2011-02-19 23:56:38 sakurai>
+;; Time-stamp: <2011-02-20 00:01:36 sakurai>
 
 ;; Author: SAKURAI Masashi <m.sakurai atmark kiwanami.net>
 ;; Keywords: password, convenience
@@ -22,9 +22,9 @@
 ;;; Commentary:
 
 ;; ID-password management utility.
-;; This utility manages a ID-password list and generates passwords.
+;; This utility manages ID-password list and generates passwords.
 
-;; The ID-password DB is saved in a tab-separated file.  The default
+;; The ID-password DB is saved in the tab-separated file.  The default
 ;; file name of the DB `idm-database-file' is "~/.idm-db.gpg".
 ;; The file format is following:
 ;;   (name)^t(ID)^t(password)^t(Update date "YYYY/MM/DD")[^t(memo)]
