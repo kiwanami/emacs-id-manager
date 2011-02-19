@@ -1,7 +1,7 @@
 ;;; id-manager.el --- id-password management 
 
 ;; Copyright (C) 2009, 2010, 2011  SAKURAI Masashi
-;; Time-stamp: <2011-02-19 23:18:32 sakurai>
+;; Time-stamp: <2011-02-19 23:29:25 sakurai>
 
 ;; Author: SAKURAI Masashi <m.sakurai@kiwanami.net>
 ;; Keywords: password, convenience
@@ -702,7 +702,7 @@ buffer."
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Anything UI
 
-(defun idm-anything-add-dialog (db)
+(defun idm--anything-add-dialog (db)
   "Add a new record by the anything interface."
   (interactive)
   (lexical-let ((db db))
@@ -713,7 +713,7 @@ buffer."
        (when (eq major-mode 'idm-list-mode)
          (idm--layout-list db))))))
 
-(defun idm-anything-edit-dialog (db record)
+(defun idm--anything-edit-dialog (db record)
   "Edit a record selected by the anything interface."
   (interactive)
   (lexical-let ((db db) (prev record))
@@ -726,55 +726,57 @@ buffer."
        (when (eq major-mode 'idm-list-mode)
          (idm--layout-list db))))))
 
-(when (featurep 'anything)
+(defun idm-anything-command ()
+  "Anything interface for id-manager."
+  (interactive)
+  (let* ((db (idm-load-db))
+         (source-commands 
+          `((name . "Global Command : ")
+            (candidates 
+             . (("Add a record" .
+                 (lambda ()
+                   (idm--anything-add-dialog db)))
+                ("Show all records" .
+                 (lambda ()
+                   (idm-open-list-command db)))))
+            (action . (("Execute" . (lambda (i) (funcall i)))))))
+         (source-records 
+          '((name . "Accounts : ")
+            (candidates 
+             . (lambda ()
+                 (mapcar
+                  (lambda (record)
+                    (cons (concat 
+                           (idm-record-name record) 
+                           " (" (idm-record-account-id record) ") "
+                           "   " (idm-record-memo record))
+                          record))
+                  (funcall db 'get-all-records))))
+            (action 
+             . (("Copy password" 
+                 . (lambda (record) 
+                     (message (concat "Copied the password for the account ID: "
+                                      (idm-record-account-id record)))
+                     (funcall idm-copy-action (idm-record-password record))))
+                ("Show ID / Password" 
+                 . (lambda (record) 
+                     (idm--message 
+                      (concat 
+                       "ID: " (idm-record-account-id record)
+                       " / PW: "(idm-record-password record)))))
+                ("Edit fields" 
+                 . (lambda (record)
+                     (idm--anything-edit-dialog db record)))
+                )))
+          ))
+    (anything 
+     '(source-commands source-records)
+     nil "ID-Password Management : " nil nil)))
 
-  (defun id-manager ()
-    (interactive)
-    (let* ((db (idm-load-db))
-           (source-commands 
-            `((name . "Global Command : ")
-              (candidates 
-               . (("Add a record" .
-                   (lambda ()
-                     (idm-anything-add-dialog db)))
-                  ("Show all records" .
-                   (lambda ()
-                     (idm-open-list-command db)))))
-              (action . (("Execute" . (lambda (i) (funcall i)))))))
-           (source-records 
-            '((name . "Accounts : ")
-              (candidates 
-               . (lambda ()
-                   (mapcar
-                    (lambda (record)
-                      (cons (concat 
-                             (idm-record-name record) 
-                             " (" (idm-record-account-id record) ") "
-                             "   " (idm-record-memo record))
-                             record))
-                    (funcall db 'get-all-records))))
-              (action 
-               . (("Copy password" 
-                   . (lambda (record) 
-                       (message (concat "Copied the password for the account ID: "
-                                        (idm-record-account-id record)))
-                       (funcall idm-copy-action (idm-record-password record))))
-                  ("Show ID / Password" 
-                   . (lambda (record) 
-                       (idm--message 
-                        (concat 
-                         "ID: " (idm-record-account-id record)
-                         " / PW: "(idm-record-password record)))))
-                  ("Edit fields" 
-                   . (lambda (record)
-                       (idm-anything-edit-dialog db record)))
-                  )))
-            ))
-      (anything 
-       '(source-commands source-records)
-       nil "ID-Password Management : " nil nil)))
+(defalias 'id-manager 'idm-open-list-command)
 
-  ) ; anything
+(eval-after-load "anything"
+  '(defalias 'id-manager 'idm-anything-command))
 
 (provide 'id-manager)
 ;;; id-manager.el ends here
