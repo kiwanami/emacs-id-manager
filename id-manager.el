@@ -1,9 +1,9 @@
 ;;; id-manager.el --- id-password management 
 
 ;; Copyright (C) 2009, 2010, 2011  SAKURAI Masashi
-;; Time-stamp: <2011-02-19 23:29:25 sakurai>
+;; Time-stamp: <2011-02-19 23:56:38 sakurai>
 
-;; Author: SAKURAI Masashi <m.sakurai@kiwanami.net>
+;; Author: SAKURAI Masashi <m.sakurai atmark kiwanami.net>
 ;; Keywords: password, convenience
 
 ;; This program is free software; you can redistribute it and/or modify
@@ -32,7 +32,7 @@
 ;; the Excel.
 ;; 
 ;; Implicitly, this elisp program expects that the DB file is
-;; encripted by the some GPG encryption elisp, such as EasyPG or
+;; encrypted by the some GPG encryption elisp, such as EasyPG or
 ;; alpaca.
 ;;
 ;; Excuting the command `idm-open-list-command', you can open the 
