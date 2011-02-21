@@ -1,7 +1,7 @@
 ;;; id-manager.el --- id-password management 
 
 ;; Copyright (C) 2009, 2010, 2011  SAKURAI Masashi
-;; Time-stamp: <2011-02-20 00:01:36 sakurai>
+;; Time-stamp: <2011-02-21 21:32:13 sakurai>
 
 ;; Author: SAKURAI Masashi <m.sakurai atmark kiwanami.net>
 ;; Keywords: password, convenience
@@ -211,16 +211,16 @@ The object is a dispatch function. One can access the methods
         (progn 
           (lexical-let* ((record (car args)) 
                          (name (idm-record-name record)))
-            (setf records (delete-if 
-                           (lambda (i) (equal (idm-record-name i) name))
-                           records))
+            (setf records (loop for i in records
+                                unless (equal (idm-record-name i) name)
+                                collect i))
             (push record records)
             (setq db-modified t))))
        ((eq method 'delete-record-by-name)    ; delete-record-by-name
         (lexical-let ((name (car args)))
-          (setf records (delete-if 
-                         (lambda (i) (equal (idm-record-name i) name))
-                         records))
+          (setf records (loop for i in records
+                         unless (equal (idm-record-name i) name)
+                         collect i))
           (setq db-modified t)))
        ((eq method 'set-modified)             ; set-modified
         (setq db-modified t))
@@ -257,7 +257,7 @@ The object is a dispatch function. One can access the methods
     (apply 'encode-time 
            (let (ret)
              (dotimes (i 6)
-               (push (string-to-int (match-string (+ i 1) str)) ret))
+               (push (string-to-number (match-string (+ i 1) str)) ret))
              ret))))
 
 (defun idm--message (&rest args)
@@ -460,14 +460,14 @@ If the user pushes the `ok' button, the function
 lines. ORDER is sort key, which can be `time', `name' and `id'."
   (unless order
     (setq order 'name))
-  (let ((name-max (length "Account Name")) 
-        (id-max (length "ID"))
-        (pw-max (length "Password"))
-        (pw-mask "********")
-        (pw-getter (lambda (record) 
-                     (if idm-show-password
-                         (idm-record-password record)
-                       pw-mask)))
+  (let* ((name-max (length "Account Name")) 
+         (id-max (length "ID"))
+         (pw-max (length "Password"))
+         (pw-mask "********")
+         (pw-getter (lambda (record) 
+                      (if idm-show-password
+                          (idm-record-password record)
+                        pw-mask)))
         (cut (lambda (str) (substring str 0 (min (length str) 20))))
         numcolm (count 1) 
         (line-format "%%-%ds|%%-10s |  %%-%ds | %%-%ds  :  %%-%ds   : %%s\n")
@@ -534,7 +534,7 @@ lines. ORDER is sort key, which can be `time', `name' and `id'."
                     (funcall b i j)
                   v)))))))
   (sort 
-   (copy-list records)
+   (loop for i in records collect i) ; copy-list
    (cond
     ((eq order 'id)   ; id -> id, name
      (funcall to-bool (funcall chain cmp-id cmp-name)))
