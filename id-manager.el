@@ -117,6 +117,9 @@
 (defvar idm-db-buffer-password-var nil
   "Password variable. See the text of settings for alpaca.el. ")
 
+(defvar idm-clipboard-expire-time-sec 5
+  "Expire time for the clipboard content.")
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Macros
 
@@ -601,9 +604,20 @@ lines. ORDER is sort key, which can be `time', `name' and `id'."
   (idm--aif (idm--get-record-id)
       (let ((record (funcall idm-db 'get it)))
         (when record
-          (message (concat "Copied the password for the account ID: "
-                           (idm-record-account-id record)))
-          (funcall idm-copy-action (idm-record-password record))))))
+          (idm--copy-action record)))))
+
+(defun idm--copy-action (record)
+  (interactive)
+  (message (concat "Copied the password for the account ID: "
+                   (idm-record-account-id record)))
+  (funcall idm-copy-action (idm-record-password record))
+  (when idm-clipboard-expire-time-sec
+    (run-at-time idm-clipboard-expire-time-sec nil 'idm-expire-password)))
+
+(defun idm-expire-password ()
+  "expire-password"
+  (funcall idm-copy-action "")
+  (idm--message "ID Manager: expired."))
 
 (defun idm-list-mode-sortby-id ()
   (interactive)
@@ -766,19 +780,17 @@ buffer."
                            "   " (idm-record-memo record))
                           record))
                   (funcall db 'get-all-records))))
-            (action 
-             . (("Copy password" 
-                 . (lambda (record) 
-                     (message (concat "Copied the password for the account ID: "
-                                      (idm-record-account-id record)))
-                     (funcall idm-copy-action (idm-record-password record))))
-                ("Show ID / Password" 
-                 . (lambda (record) 
-                     (idm--message 
-                      (concat 
+            (action
+             . (("Copy password"
+                 . (lambda (record)
+                     (idm--copy-action record)))
+                ("Show ID / Password"
+                 . (lambda (record)
+                     (idm--message
+                      (concat
                        "ID: " (idm-record-account-id record)
                        " / PW: "(idm-record-password record)))))
-                ("Edit fields" 
+                ("Edit fields"
                  . (lambda (record)
                      (idm--anything-edit-dialog db record)))
                 )))
