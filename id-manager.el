@@ -163,7 +163,7 @@
           db)
       (kill-buffer tmpbuf))))
 
-(defun idm--save-db (records &optional password)
+(defun idm--save-db (records file-vars &optional password)
   "Save RECORDS into the DB file `idm-database-file'. This
 function is called by a DB object."
   (let ((coding-system-for-write 'utf-8)
@@ -171,6 +171,12 @@ function is called by a DB object."
     (with-current-buffer tmpbuf
       (erase-buffer)
       (goto-char (point-min))
+      (loop for (sym . v) in file-vars do
+            (set (make-local-variable sym) v))
+      (insert (format
+               ";; -*- %s -*-"
+               (loop for (n . v) in file-vars concat
+                     (format "%s: %S; " n v))) "\n")
       (dolist (i records)
         (insert (concat (idm-record-name i) "\t"
                         (idm-record-account-id i) "\t"
@@ -188,15 +194,23 @@ function is called by a DB object."
   "Build a database management object from the given buffer text.
 The object is a dispatch function. One can access the methods
 `funcall' with the method name symbol and some method arguments."
-  (lexical-let (records (db-modified nil) file-password)
-    (idm--each-line 
-     tmpbuf 
+  (lexical-let (records
+                (db-modified nil)
+                file-vars               ; file variables
+                file-password)          ; password for alpaca
+    (setq file-vars (buffer-local-value 'file-local-variables-alist tmpbuf))
+    (idm--each-line
+     tmpbuf
      (lambda (line)
-       (let ((cols (split-string line "\t")))
-         (if (or (= 4 (length cols))
-                 (= 5 (length cols)))
-             (push (apply 'make-idm-record-bylist cols)
-                   records)))))
+       (cond
+        ((string-match "^;; " line) ; file variables
+         ) ; ignore
+        (t ; entry lines
+         (let ((cols (split-string line "\t")))
+           (if (or (= 4 (length cols))
+                   (= 5 (length cols)))
+               (push (apply 'make-idm-record-bylist cols)
+                     records)))))))
     (lambda (method &rest args)
       (cond
        ((eq method 'get)                      ; get record object by name
@@ -225,8 +239,8 @@ The object is a dispatch function. One can access the methods
        ((eq method 'set-modified)             ; set-modified
         (setq db-modified t))
        ((eq method 'save)                     ; save
-        (when db-modified 
-          (idm--save-db records file-password)
+        (when db-modified
+          (idm--save-db records file-vars file-password)
           (setq db-modified nil)))
        ((eq method 'file-password)            ; file-password
         (setq file-password (car args)) nil)
