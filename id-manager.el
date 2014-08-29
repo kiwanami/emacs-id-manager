@@ -45,7 +45,7 @@
 ;; ------------------------------
 ;; (require 'id-manager)
 ;; ------------------------------
-;; If you have anything.el, bind `id-manager' to key,
+;; If you have helm.el, bind `id-manager' to key,
 ;; like (global-set-key (kbd "M-7") 'id-manager).
 
 ;;; Setting example:
@@ -53,14 +53,14 @@
 ;; For EasyPG users:
 ;;
 ;; (autoload 'id-manager "id-manager" nil t)
-;; (global-set-key (kbd "M-7") 'id-manager)                     ; anything UI
+;; (global-set-key (kbd "M-7") 'id-manager)                     ; helm UI
 ;; (setq epa-file-cache-passphrase-for-symmetric-encryption t)  ; saving password
 ;; (setenv "GPG_AGENT_INFO" nil)                                ; non-GUI password dialog.
 
 ;; For alpaca users:
 ;;
 ;; (autoload 'id-manager "id-manager" nil t)
-;; (global-set-key (kbd "M-7") 'id-manager) ; anything UI
+;; (global-set-key (kbd "M-7") 'id-manager) ; helm UI
 ;; (setq idm-db-buffer-save-function ; adjustment for alpaca.el
 ;;       (lambda (file)
 ;;         (set-visited-file-name file)
@@ -728,10 +728,10 @@ buffer."
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; Anything UI
+;; Helm UI
 
-(defun idm--anything-add-dialog (db)
-  "Add a new record by the anything interface."
+(defun idm--helm-add-dialog (db)
+  "Add a new record by the helm interface."
   (interactive)
   (lexical-let ((db db))
     (idm-add-record-dialog db
@@ -741,8 +741,8 @@ buffer."
        (when (eq major-mode 'idm-list-mode)
          (idm--layout-list db))))))
 
-(defun idm--anything-edit-dialog (db record)
-  "Edit a record selected by the anything interface."
+(defun idm--helm-edit-dialog (db record)
+  "Edit a record selected by the helm interface."
   (interactive)
   (lexical-let ((db db) (prev record))
     (idm-edit-record-dialog
@@ -754,8 +754,8 @@ buffer."
        (when (eq major-mode 'idm-list-mode)
          (idm--layout-list db))))))
 
-(defun idm-anything-command ()
-  "Anything interface for id-manager."
+(defun idm-helm-command ()
+  "Helm interface for id-manager."
   (interactive)
   (let* ((db (idm-load-db))
          (source-commands
@@ -763,7 +763,7 @@ buffer."
             (candidates
              . (("Add a record" .
                  (lambda ()
-                   (idm--anything-add-dialog db)))
+                   (idm--helm-add-dialog db)))
                 ("Show all records" .
                  (lambda ()
                    (idm-open-list-command db)))))
@@ -792,17 +792,17 @@ buffer."
                        " / PW: "(idm-record-password record)))))
                 ("Edit fields"
                  . (lambda (record)
-                     (idm--anything-edit-dialog db record)))
+                     (idm--helm-edit-dialog db record)))
                 )))
           ))
-    (anything
+    (helm
      '(source-commands source-records)
      nil "ID-Password Management : " nil nil)))
 
 (defalias 'id-manager 'idm-open-list-command)
 
-(eval-after-load "anything"
-  '(defalias 'id-manager 'idm-anything-command))
+(eval-after-load "helm"
+  '(defalias 'id-manager 'idm-helm-command))
 
 (provide 'id-manager)
 ;;; id-manager.el ends here
