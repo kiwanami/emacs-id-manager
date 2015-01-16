@@ -604,18 +604,28 @@ lines. ORDER is sort key, which can be `time', `name' and `id'."
   (idm--aif (idm--get-record-id)
       (let ((record (funcall idm-db 'get it)))
         (when record
-          (idm--copy-action record)))))
+          (idm--copy-password-action record)))))
 
-(defun idm--copy-action (record)
+(defun idm--copy-password-action (record)
   (interactive)
   (message (concat "Copied the password for the account ID: "
                    (idm-record-account-id record)))
   (funcall idm-copy-action (idm-record-password record))
-  (when idm-clipboard-expire-time-sec
-    (run-at-time idm-clipboard-expire-time-sec nil 'idm-expire-password)))
+  (idm-set-clipboard-expiry))
 
-(defun idm-expire-password ()
-  "expire-password"
+(defun idm--copy-id-action (record)
+  (interactive)
+  (message (concat "Copied account ID: "
+                   (idm-record-account-id record)))
+  (funcall idm-copy-action (idm-record-account-id record))
+  (idm-set-clipboard-expiry))
+
+(defun idm-set-clipboard-expiry ()
+  (when idm-clipboard-expire-time-sec
+    (run-at-time idm-clipboard-expire-time-sec nil 'idm-expire-clipboard)))
+
+(defun idm-expire-clipboard ()
+  "Clear clipboard"
   (funcall idm-copy-action "")
   (idm--message "ID Manager: expired."))
 
@@ -783,7 +793,10 @@ buffer."
             (action
              . (("Copy password"
                  . (lambda (record)
-                     (idm--copy-action record)))
+                     (idm--copy-password-action record)))
+		("Copy id"
+                 . (lambda (record)
+                     (idm--copy-id-action record)))
                 ("Show ID / Password"
                  . (lambda (record)
                      (idm--message
