@@ -1,7 +1,7 @@
 ;;; id-manager.el --- id-password management
 
 ;; Copyright (C) 2009, 2010, 2011, 2013  SAKURAI Masashi
-;; Time-stamp: <2013-12-17 10:22:03 sakurai>
+;; Time-stamp: <2015-06-06 12:38:31 sakurai>
 
 ;; Author: SAKURAI Masashi <m.sakurai atmark kiwanami.net>
 ;; Keywords: password, convenience
@@ -94,7 +94,10 @@
   end with '.gpg' for encryption by the GnuPG.")
 
 (defvar idm-gen-password-cmd
-  "head -c 10 < /dev/random | uuencode -m - | tail -n 2 |head -n 1 | head -c10")
+  "head -c 10 < /dev/random | uuencode -m - | tail -n 2 |head -n 1 | head -c10"
+  "[String] Password generation command. If a function symbol or
+  lambda whose receive no parameter is set to this variable,
+  id-manager calls the function to generate the password.")
 ;;  "openssl rand 32 | uuencode -m - | tail -n 2 |head -n 1 | head -c10"
 ;;  ...any other password generation ?
 
@@ -134,14 +137,20 @@
 
 (defun idm-gen-password ()
   "Generate a password."
-  (let ((buf (get-buffer-create " *idm-work*")) ret)
-    (call-process-shell-command
-     idm-gen-password-cmd
-     nil buf nil)
-    (with-current-buffer buf
-      (setq ret (buffer-string)))
-    (kill-buffer buf)
-    ret))
+  (cond
+   ((functionp idm-gen-password-cmd)
+    (funcall idm-gen-password-cmd))
+   ((stringp idm-gen-password-cmd)
+    (let ((buf (get-buffer-create " *idm-work*")) ret)
+      (call-process-shell-command
+       idm-gen-password-cmd
+       nil buf nil)
+      (with-current-buffer buf
+        (setq ret (buffer-string)))
+      (kill-buffer buf)
+      ret))
+   (t (error "idm-gen-password-cmd is set to wrong value. [%S]"
+             idm-gen-password-cmd))))
 
 ;; record struct
 (defstruct (idm-record
@@ -729,6 +738,7 @@ buffer."
                    (funcall db 'add-record r)
                    (idm--layout-list db)))))))))
 
+;;;###autoload
 (defun idm-open-list-command (&optional db)
   "Load the id-password DB and open a list buffer."
   (interactive)
@@ -764,6 +774,7 @@ buffer."
        (when (eq major-mode 'idm-list-mode)
          (idm--layout-list db))))))
 
+;;;###autoload
 (defun idm-helm-command ()
   "Helm interface for id-manager."
   (interactive)
