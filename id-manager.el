@@ -123,6 +123,9 @@
 (defvar idm-clipboard-expire-time-sec 5
   "Expire time for the clipboard content.")
 
+(defvar idm-clipboard-expire-timer nil
+  "The timer object that will expire the clipboard content.")
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Macros
 
@@ -630,8 +633,11 @@ lines. ORDER is sort key, which can be `time', `name' and `id'."
   (idm-set-clipboard-expiry))
 
 (defun idm-set-clipboard-expiry ()
+  (when idm-clipboard-expire-timer
+    (cancel-timer idm-clipboard-expire-timer))
   (when idm-clipboard-expire-time-sec
-    (run-at-time idm-clipboard-expire-time-sec nil 'idm-expire-clipboard)))
+    (setq idm-clipboard-expire-timer
+          (run-at-time idm-clipboard-expire-time-sec nil 'idm-expire-clipboard))))
 
 (defun idm-expire-clipboard ()
   "Clear clipboard"
