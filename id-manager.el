@@ -809,7 +809,8 @@ buffer."
                                                                 "ID: " (idm-record-account-id record)
                                                                 " / PW: "(idm-record-password record))))
                                        "Edit fields" (lambda (record)
-                                                        (idm--helm-edit-dialog db record))))))
+                                                       (idm--helm-edit-dialog db record)))
+            :migemo t)))
          (helm
           :sources '(source-commands souce-records)
           :buffer "ID-Password Management : ")))
