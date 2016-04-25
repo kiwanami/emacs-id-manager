@@ -786,48 +786,40 @@ buffer."
   (interactive)
   (let* ((db (idm-load-db))
          (source-commands
-          `((name . "Global Command : ")
-            (candidates
-             . (("Add a record" .
-                 (lambda ()
-                   (idm--helm-add-dialog db)))
-                ("Show all records" .
-                 (lambda ()
-                   (idm-open-list-command db)))))
-            (action . (("Execute" . (lambda (i) (funcall i)))))))
-         (source-records
-          '((name . "Accounts : ")
-            (candidates
-             . (lambda ()
-                 (mapcar
-                  (lambda (record)
-                    (cons (concat
-                           (idm-record-name record)
-                           " (" (idm-record-account-id record) ") "
-                           "   " (idm-record-memo record))
-                          record))
-                  (funcall db 'get-all-records))))
-            (action
-             . (("Copy password"
-                 . (lambda (record)
-                     (idm--copy-password-action record)))
-		("Copy id"
-                 . (lambda (record)
-                     (idm--copy-id-action record)))
-                ("Show ID / Password"
-                 . (lambda (record)
-                     (idm--message
-                      (concat
-                       "ID: " (idm-record-account-id record)
-                       " / PW: "(idm-record-password record)))))
-                ("Edit fields"
-                 . (lambda (record)
-                     (idm--helm-edit-dialog db record)))
-                )))
-          ))
-    (helm
-     '(source-commands source-records)
-     nil "ID-Password Management : " nil nil)))
+          (helm-build-sync-source "id-manager-global-command"
+            :name "Global Command : "
+            :candidates '(("Add a record" . (lambda ()
+                                              (idm--helm-add-dialog db)))
+                          ("Show all records" . (lambda ()
+                                                  (idm-open-list-command db))))
+            :action (helm-make-actions "Execute" (lambda (i) (funcall i)))))
+         (souce-records
+          (helm-build-sync-source "id-manager-source-commands"
+            :name "Accounts : "
+            :candidates (lambda ()
+                          (mapcar
+                           (lambda (record)
+                             (cons (concat
+                                    (idm-record-name record)
+                                    " (" (idm-record-account-id record) ") "
+                                    "   " (idm-record-memo record))
+                                   record))
+                           (funcall db 'get-all-records)))
+            :action (helm-make-actions "Copy password" (lambda (record)
+                                                         (idm--copy-password-action record))
+                                       "Copy id" (lambda (record)
+                                                   (idm--copy-id-action record))
+                                       "Show ID / Password" (lambda (record)
+                                                              (idm--message
+                                                               (concat
+                                                                "ID: " (idm-record-account-id record)
+                                                                " / PW: "(idm-record-password record))))
+                                       "Edit fields" (lambda (record)
+                                                       (idm--helm-edit-dialog db record)))
+            :migemo t)))
+         (helm
+          :sources '(source-commands souce-records)
+          :buffer "ID-Password Management : ")))
 
 (defalias 'id-manager 'idm-open-list-command)
 
