@@ -188,10 +188,11 @@ function is called by a DB object."
       (goto-char (point-min))
       (loop for (sym . v) in file-vars do
             (set (make-local-variable sym) v))
-      (insert (format
-               ";; -*- %s -*-"
-               (loop for (n . v) in file-vars concat
-                     (format "%s: %S; " n v))) "\n")
+      (when file-vars
+        (insert (format
+                 ";; -*- %s -*-"
+                 (loop for (n . v) in file-vars concat
+                       (format "%s: %S; " n v))) "\n"))
       (dolist (i records)
         (insert (concat (idm-record-name i) "\t"
                         (idm-record-account-id i) "\t"
