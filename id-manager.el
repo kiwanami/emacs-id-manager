@@ -78,6 +78,16 @@
 ;; securely.  But I'm not sure that this program is secure enough.
 ;; I'd like many people to check and advice me.
 
+;;; Integrating with OS launchers (Alfred, QuickSilver, Launchbar, etc.)
+
+;; Invoke id-manager with an input string.
+
+;; An example script to use for Alfred:
+
+;; INPUT="{query}"
+;; osascript -e 'tell app "Emacs" to activate'
+;; emacsclient -e "(id-manager \"$INPUT\"))"
+
 ;;; Code:
 
 (eval-when-compile (require 'cl))
@@ -782,8 +792,10 @@ buffer."
          (idm--layout-list db))))))
 
 ;;;###autoload
-(defun idm-helm-command ()
-  "Helm interface for id-manager."
+(defun idm-helm-command (&optional input-string)
+  "Helm interface for id-manager.
+
+INPUT-STRING is an optional input to start Helm with.  Useful for scripting interactions with OS launchers."
   (interactive)
   (let* ((db (idm-load-db))
          (source-commands
@@ -794,7 +806,7 @@ buffer."
                           ("Show all records" . (lambda ()
                                                   (idm-open-list-command db))))
             :action (helm-make-actions "Execute" (lambda (i) (funcall i)))))
-         (souce-records
+         (source-records
           (helm-build-sync-source "id-manager-source-commands"
             :name "Accounts : "
             :candidates (lambda ()
@@ -819,7 +831,8 @@ buffer."
                                                        (idm--helm-edit-dialog db record)))
             :migemo t)))
          (helm
-          :sources '(source-commands souce-records)
+          :sources '(source-commands source-records)
+          :input input-string
           :buffer "ID-Password Management : ")))
 
 (defalias 'id-manager 'idm-open-list-command)
