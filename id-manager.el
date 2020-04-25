@@ -90,10 +90,10 @@
 
 ;;; Code:
 
-(require 'cl)
+(eval-when-compile (require 'cl))
 
 (require 'widget)
-(require 'wid-edit)
+(eval-when-compile (require 'wid-edit))
 
 (require 'helm)
 (require 'helm-source)
