@@ -90,10 +90,10 @@
 
 ;;; Code:
 
-(eval-and-compile (require 'cl))
+(require 'cl)
 
 (require 'widget)
-(eval-and-compile (require 'wid-edit))
+(require 'wid-edit)
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
