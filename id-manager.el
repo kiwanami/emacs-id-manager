@@ -95,6 +95,9 @@
 (require 'widget)
 (require 'wid-edit)
 
+(require 'helm)
+(require 'helm-source)
+
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Setting
