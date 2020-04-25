@@ -799,16 +799,14 @@ INPUT-STRING is an optional input to start Helm with.  Useful for scripting inte
   (interactive)
   (let* ((db (idm-load-db))
          (source-commands
-          (helm-build-sync-source "id-manager-global-command"
-            :name "Global Command : "
+          (helm-build-sync-source "Global Command : "
             :candidates '(("Add a record" . (lambda ()
                                               (idm--helm-add-dialog db)))
                           ("Show all records" . (lambda ()
                                                   (idm-open-list-command db))))
             :action (helm-make-actions "Execute" (lambda (i) (funcall i)))))
          (source-records
-          (helm-build-sync-source "id-manager-source-commands"
-            :name "Accounts : "
+          (helm-build-sync-source "Accounts : "
             :candidates (lambda ()
                           (mapcar
                            (lambda (record)
